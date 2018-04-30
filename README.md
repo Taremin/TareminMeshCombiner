@@ -8,7 +8,7 @@ Taremin が Blender を使う上で便利そうな機能を詰め込んだ Blend
 
 zip ファイルをダウンロードして、「ファイル」「ユーザー設定」「アドオン」「ファイルからアドオンをインストール」を選択し、ダウンロードした zip ファイルをインストールします。
 
-![ダウンロード方法](images/how_to_download)
+![ダウンロード方法](images/how_to_download.png)
 
 3D View: Taremin Blender Plugin という項目がアドオン一覧に追加されるのでチェックボックスをオンにします。
 
