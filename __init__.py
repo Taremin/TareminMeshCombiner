@@ -12,7 +12,7 @@ bl_info = {
     'author': 'Taremin',
     'location': 'View 3D > Tool Shelf > Taremin',
     'description': "Taremin's private plugin",
-    'version': [0, 0, 1],
+    'version': [0, 0, 2],
     'blender': (2, 79, 0),
     'wiki_url': '',
     'tracker_url': '',
@@ -32,6 +32,11 @@ bpy.types.Scene.rename_uvmaps = bpy.props.BoolProperty(
     description="ユーザ設定の翻訳で「新しいデータ」にチェックが入っている場合、英語(UVMap)と日本語(UVマップ)のUVマップがそれぞれ存在する場合がある。\n"
         "メッシュオブジェクトの結合を行った時、このUVMapが混在していると日本語か英語のUVマップどちらか片方が反映できなくなる場合がある。\n"
         "UVMapのリネームをオンにしているとオブジェクトの結合を行う前にすべてのUVMapを 'UVMap' にリネームする。"
+)
+bpy.types.Scene.remove_unselected_layer = bpy.props.BoolProperty(
+    name="非アクティブレイヤーのオブジェクト削除",
+    default=True,
+    description="非アクティブレイヤーのオブジェクトを削除する。"
 )
 
 class OptimizeButton(bpy.types.Operator):
@@ -84,7 +89,7 @@ class OptimizeButton(bpy.types.Operator):
         #
         # UVマップのリネーム
         #
-        if context.scene.rename_uvmaps:
+        if scene.rename_uvmaps:
             print("Rename UVMaps")
             for obj in scene.objects:
                 if (obj.type not in ('MESH')):
@@ -110,14 +115,33 @@ class OptimizeButton(bpy.types.Operator):
         # オブジェクトは不可視状態のままだと削除できてないので解除する必要がある
         # (Pythonコンソールだと不可視のまま削除できる)
         #
-        if context.scene.remove_unnecessary_objects:
+        if scene.remove_unnecessary_objects:
             print("Delete all hide objects")
             bpy.ops.object.select_all(action='DESELECT')
             for obj in deletes:
                 print("\t{} - Delete".format(obj.name))
                 obj.hide = False
                 self.select(obj)
-                bpy.ops.object.delete()
+            bpy.ops.object.delete()
+
+        #
+        # 非選択レイヤーのオブジェクトを削除
+        #
+        if scene.remove_unselected_layer:
+            print("Delete all unselected layer objects")
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in scene.objects:
+                selected = False
+                for layer_index in range(len(scene.layers)):
+                    if scene.layers[layer_index] and obj.layers[layer_index]:
+                        selected = True
+                if not selected:
+                    print("\t{} - Delete".format(obj.name))
+                    for object_layer_index in range(len(obj.layers)):
+                        obj.layers[object_layer_index] = True
+                    obj.hide = False
+                    self.select(obj)
+            bpy.ops.object.delete()
 
         # active
         if active in meshes:
@@ -145,18 +169,18 @@ class TareminPanel(bpy.types.Panel):
         row = col.row(align=True)
         row.prop(context.scene, 'remove_unnecessary_objects')
         row = col.row(align=True)
+        row.prop(context.scene, 'remove_unselected_layer')
+        row = col.row(align=True)
         row.prop(context.scene, 'rename_uvmaps')
         row = col.row(align=True)
         row.label('結合先のオブジェクトをアクティブにしてから最適化を行ってください。')
         row = col.row(align=True)
         row.operator('taremin.optimize')
 
-
 classesToRegister = [
     TareminPanel,
     OptimizeButton,
 ]
-
 
 def register():
     for value in classesToRegister:
