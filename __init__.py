@@ -12,7 +12,7 @@ bl_info = {
     'author': 'Taremin',
     'location': 'View 3D > Tool Shelf > Taremin',
     'description': "Taremin's private plugin",
-    'version': [0, 0, 2],
+    'version': [0, 0, 3],
     'blender': (2, 79, 0),
     'wiki_url': '',
     'tracker_url': '',
@@ -79,12 +79,22 @@ class OptimizeButton(bpy.types.Operator):
 
             meshes.append(obj)
             print("{} - {} ({})".format(obj.name, obj.type, obj.hide))
-            for mod in obj.modifiers:
-                if (mod.type not in ('ARMATURE')):
-                    print("\t{} - Apply".format(mod.type))
-                    bpy.ops.object.modifier_apply(modifier=mod.name)
-                else:
-                    print("\t{} - Skip".format(mod.type))
+            if obj.data.shape_keys and bpy.ops.object.apply_selected_modifier:
+                for mod in obj.modifiers:
+                    if (mod.type in ('ARMATURE')):
+                        mod.show_viewport = False
+                print("\t{} - All apply".format(mod.type))
+                bpy.ops.object.apply_all_modifier()
+                for mod in obj.modifiers:
+                    if (mod.type in ('ARMATURE')):
+                        mod.show_viewport = True
+            else:
+                for mod in obj.modifiers:
+                    if (mod.type not in ('ARMATURE')):
+                        print("\t{} - Apply".format(mod.type))
+                        bpy.ops.object.modifier_apply(modifier=mod.name)
+                    else:
+                        print("\t{} - Skip".format(mod.type))
 
         #
         # UVマップのリネーム
