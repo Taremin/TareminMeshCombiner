@@ -33,6 +33,11 @@ bpy.types.Scene.remove_unselected_layer = bpy.props.BoolProperty(
     default=True,
     description="非アクティブレイヤーのオブジェクトを削除する。"
 )
+bpy.types.Scene.remove_unnecessary_bones = bpy.props.BoolProperty(
+    name="非選択アーマチュアレイヤーのボーン削除",
+    default=True,
+    description="非選択状態のアーマチュアレイヤーにあるボーンの削除を行う。"
+)
 
 class OptimizeButton(bpy.types.Operator):
     bl_idname = 'taremin.optimize'
@@ -156,29 +161,30 @@ class OptimizeButton(bpy.types.Operator):
         #
         # 非選択アーマチュアレイヤーのボーンを削除
         #
-        print("Delete all unselected armature layer bones")
-        for armature in bpy.data.objects:
-            if armature.type != "ARMATURE":
-                continue
-            
-            bpy.ops.object.select_all(action='DESELECT')
-            self.select(armature)
-            bpy.ops.object.mode_set(mode='EDIT')
+        if scene.remove_unnecessary_bones:
+            print("Delete all unselected armature layer bones")
+            for armature in bpy.data.objects:
+                if armature.type != "ARMATURE":
+                    continue
+                
+                bpy.ops.object.select_all(action='DESELECT')
+                self.select(armature)
+                bpy.ops.object.mode_set(mode='EDIT')
 
-            for bone in armature.data.edit_bones:
-                selected = False
-                for layer_index in range(len(bone.layers)):
-                    if armature.data.layers[layer_index] and bone.layers[layer_index]:
-                        selected = True
-                        break
-                if not selected:
-                    print("\t{} - Delete Bone".format(bone.name))
-                    for bone_layer_index in range(len(bone.layers)):
-                        bone.layers[object_layer_index] = True
-                    bone.hide = False
-                    bone.select = True
-                    armature.data.edit_bones.remove(bone)
-            bpy.ops.object.mode_set(mode='OBJECT')
+                for bone in armature.data.edit_bones:
+                    selected = False
+                    for layer_index in range(len(bone.layers)):
+                        if armature.data.layers[layer_index] and bone.layers[layer_index]:
+                            selected = True
+                            break
+                    if not selected:
+                        print("\t{} - Delete Bone".format(bone.name))
+                        for bone_layer_index in range(len(bone.layers)):
+                            bone.layers[object_layer_index] = True
+                        bone.hide = False
+                        bone.select = True
+                        armature.data.edit_bones.remove(bone)
+                bpy.ops.object.mode_set(mode='OBJECT')
 
         # active
         if active in meshes:
@@ -209,6 +215,8 @@ class TareminPanel(bpy.types.Panel):
         row.prop(context.scene, 'remove_unselected_layer')
         row = col.row(align=True)
         row.prop(context.scene, 'rename_uvmaps')
+        row = col.row(align=True)
+        row.prop(context.scene, 'remove_unnecessary_bones')
         row = col.row(align=True)
         row.label('結合先のオブジェクトをアクティブにしてから最適化を行ってください。')
         row = col.row(align=True)
