@@ -150,6 +150,7 @@ class OptimizeButton(bpy.types.Operator):
                 for layer_index in range(len(scene.layers)):
                     if scene.layers[layer_index] and obj.layers[layer_index]:
                         selected = True
+                        break
                 if not selected:
                     print("\t{} - Delete".format(obj.name))
                     for object_layer_index in range(len(obj.layers)):
