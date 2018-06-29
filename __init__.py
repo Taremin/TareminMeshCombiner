@@ -102,6 +102,11 @@ class OptimizeButton(bpy.types.Operator):
                 for uvmap in obj.data.uv_layers:
                     print("\tRename {} - {} -> {}".format(obj.name, uvmap.name, 'UVMap'))
                     uvmap.name = 'UVMap'
+            for material in bpy.data.materials:
+                for texture_slot in material.texture_slots:
+                    if texture_slot == None:
+                        continue
+                    texture_slot.uv_layer = 'UVMap'
 
         #
         # メッシュオブジェクトの結合
