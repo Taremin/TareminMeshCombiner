@@ -1,10 +1,5 @@
-import os
-import sys
 import copy
-import importlib
 import bpy.utils.previews
-
-from datetime import datetime
 
 bl_info = {
     'name': 'Taremin Blender Plugin',
@@ -152,6 +147,33 @@ class OptimizeButton(bpy.types.Operator):
                     obj.hide = False
                     self.select(obj)
             bpy.ops.object.delete()
+
+        #
+        # 非選択アーマチュアレイヤーのボーンを削除
+        #
+        print("Delete all unselected armature layer bones")
+        for armature in bpy.data.objects:
+            if armature.type != "ARMATURE":
+                continue
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            self.select(armature)
+            bpy.ops.object.mode_set(mode='EDIT')
+
+            for bone in armature.data.edit_bones:
+                selected = False
+                for layer_index in range(len(bone.layers)):
+                    if armature.data.layers[layer_index] and bone.layers[layer_index]:
+                        selected = True
+                        break
+                if not selected:
+                    print("\t{} - Delete Bone".format(bone.name))
+                    for bone_layer_index in range(len(bone.layers)):
+                        bone.layers[object_layer_index] = True
+                    bone.hide = False
+                    bone.select = True
+                    armature.data.edit_bones.remove(bone)
+            bpy.ops.object.mode_set(mode='OBJECT')
 
         # active
         if active in meshes:
