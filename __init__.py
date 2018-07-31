@@ -129,6 +129,23 @@ class OptimizeButton(bpy.types.Operator):
         bpy.ops.object.join()
 
         #
+        # "Merge." から始まる頂点グループの重複頂点の削除で結合する
+        #
+        print("Merge vertex group")
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in meshes:
+            for idx in range(0, len(obj.vertex_groups)):
+                vg = obj.vertex_groups[idx]
+                bpy.ops.object.mode_set(mode='EDIT')
+                if re.compile('^Merge\.').search(vg.name):
+                    print("Merge mesh: {}".format(vg.name))
+                    bpy.ops.mesh.select_all(action='DESELECT')
+                    obj.vertex_groups.active_index = vg.index
+                    bpy.ops.object.vertex_group_select()
+                    bpy.ops.mesh.remove_doubles()
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+        #
         # 不可視状態になってる or メッシュ以外のオブジェクトの削除
         # オブジェクトは不可視状態のままだと削除できてないので解除する必要がある
         # (Pythonコンソールだと不可視のまま削除できる)
