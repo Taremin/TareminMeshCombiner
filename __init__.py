@@ -1,5 +1,6 @@
 import copy
 import bpy.utils.previews
+import re
 
 bl_info = {
     'name': 'Taremin Blender Plugin',
@@ -119,6 +120,8 @@ class OptimizeButton(bpy.types.Operator):
         print("Join all mesh objects")
         bpy.ops.object.select_all(action='DESELECT')
         for obj in meshes:
+            if re.compile('\.NoMerge$').search(obj.name):
+                continue
             print("\t{} - Join".format(obj.name))
             self.select(obj)
         if active in meshes:
