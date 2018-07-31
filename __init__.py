@@ -170,6 +170,8 @@ class OptimizeButton(bpy.types.Operator):
                 
                 bpy.ops.object.select_all(action='DESELECT')
                 self.select(armature)
+                if armature.hide:
+                    armature.hide = False
                 bpy.ops.object.mode_set(mode='EDIT')
 
                 for bone in armature.data.edit_bones:
