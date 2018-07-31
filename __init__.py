@@ -186,7 +186,6 @@ class OptimizeButton(bpy.types.Operator):
                     bpy.ops.mesh.remove_doubles()
 
                     bpy.ops.object.mode_set(mode='OBJECT')
-        print("Merge end")
 
         #
         # 非選択アーマチュアレイヤーのボーンを削除
