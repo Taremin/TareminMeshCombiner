@@ -119,31 +119,15 @@ class OptimizeButton(bpy.types.Operator):
         #
         print("Join all mesh objects")
         bpy.ops.object.select_all(action='DESELECT')
+        mesh_pattern = re.compile('\.NoMerge$')
         for obj in meshes:
-            if re.compile('\.NoMerge$').search(obj.name):
+            if mesh_pattern.search(obj.name):
                 continue
             print("\t{} - Join".format(obj.name))
             self.select(obj)
         if active in meshes:
             bpy.context.scene.objects.active = active
         bpy.ops.object.join()
-
-        #
-        # "Merge." から始まる頂点グループの重複頂点の削除で結合する
-        #
-        print("Merge vertex group")
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in meshes:
-            for idx in range(0, len(obj.vertex_groups)):
-                vg = obj.vertex_groups[idx]
-                bpy.ops.object.mode_set(mode='EDIT')
-                if re.compile('^Merge\.').search(vg.name):
-                    print("Merge mesh: {}".format(vg.name))
-                    bpy.ops.mesh.select_all(action='DESELECT')
-                    obj.vertex_groups.active_index = vg.index
-                    bpy.ops.object.vertex_group_select()
-                    bpy.ops.mesh.remove_doubles()
-                bpy.ops.object.mode_set(mode='OBJECT')
 
         #
         # 不可視状態になってる or メッシュ以外のオブジェクトの削除
@@ -178,6 +162,31 @@ class OptimizeButton(bpy.types.Operator):
                     obj.hide = False
                     self.select(obj)
             bpy.ops.object.delete()
+
+        #
+        # "Merge." から始まる頂点グループの重複頂点の削除で結合する
+        #
+        print("Merge vertex group")
+        bpy.ops.object.select_all(action='DESELECT')
+        vg_pattern = re.compile('^Merge\.')
+        for obj in scene.objects:
+            print("Mesh: {} ({})".format(obj.name, obj.type))
+            if (obj.type not in ('MESH')):
+                continue
+            for idx in range(0, len(obj.vertex_groups)):
+                vg = obj.vertex_groups[idx]
+                if vg_pattern.search(vg.name):
+                    self.select(obj)
+                    bpy.ops.object.mode_set(mode='EDIT')
+
+                    print("Merge mesh: {}".format(vg.name))
+                    bpy.ops.mesh.select_all(action='DESELECT')
+                    obj.vertex_groups.active_index = vg.index
+                    bpy.ops.object.vertex_group_select()
+                    bpy.ops.mesh.remove_doubles()
+
+                    bpy.ops.object.mode_set(mode='OBJECT')
+        print("Merge end")
 
         #
         # 非選択アーマチュアレイヤーのボーンを削除
