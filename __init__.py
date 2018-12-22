@@ -1,6 +1,7 @@
 import copy
 import bpy.utils.previews
 import re
+import numpy
 
 bl_info = {
     'name': 'Taremin Blender Plugin',
@@ -192,16 +193,17 @@ class OptimizeButton(bpy.types.Operator):
         #
         if scene.remove_unnecessary_bones:
             print("Delete all unselected armature layer bones")
+            removed_bones = []
             for armature in bpy.data.objects:
                 if armature.type != "ARMATURE":
                     continue
                 
-                bpy.ops.object.select_all(action='DESELECT')
                 self.select(armature)
                 if armature.hide:
                     armature.hide = False
                 bpy.ops.object.mode_set(mode='EDIT')
 
+                # 非選択アーマチュアレイヤーのボーンを削除
                 for bone in armature.data.edit_bones:
                     selected = False
                     for layer_index in range(len(bone.layers)):
@@ -214,8 +216,23 @@ class OptimizeButton(bpy.types.Operator):
                             bone.layers[object_layer_index] = True
                         bone.hide = False
                         bone.select = True
+
+                        if (bone.parent):
+                            removed_bones.append([bone.name, bone.parent.name])
+
                         armature.data.edit_bones.remove(bone)
                 bpy.ops.object.mode_set(mode='OBJECT')
+
+            # 削除したボーンの頂点ウェイトを親に加算していく
+            for obj in scene.objects:
+                if (obj.type not in ('MESH')):
+                    continue
+                
+                for (child, parent) in removed_bones:
+                    if obj.vertex_groups[child] and obj.vertex_groups[parent]:
+                        print("Dissolve: {} -> {}".format(child, parent))
+                        bpy.context.scene.objects.active = obj
+                        self.dissolve(obj, obj.vertex_groups[child], obj.vertex_groups[parent])
 
         # active
         if active in meshes:
@@ -224,6 +241,22 @@ class OptimizeButton(bpy.types.Operator):
             bpy.context.scene.objects.active = active
 
         return {'FINISHED'}
+
+    def dissolve(self, obj, child_vertex_group, parent_vertex_group):
+        selected = numpy.zeros(len(obj.data.vertices), dtype=numpy.bool)
+
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.vertex_group_set_active(group=child_vertex_group.name)
+        bpy.ops.object.vertex_group_select()
+        bpy.ops.object.mode_set(mode='OBJECT')
+        
+        obj.data.vertices.foreach_get('select', selected)
+
+        for v in numpy.array(obj.data.vertices)[selected]:
+            vi = [v.index]
+            parent_vertex_group.add(vi, child_vertex_group.weight(v.index), 'ADD')
+            child_vertex_group.remove(vi)
 
 class TareminPanel(bpy.types.Panel):
     bl_label = 'Taremin Blender Plugin'
