@@ -9,7 +9,7 @@ bl_info = {
     'author': 'Taremin',
     'location': 'View 3D > Tool Shelf > Taremin',
     'description': "Taremin's private plugin",
-    'version': [0, 0, 5],
+    'version': [0, 0, 6],
     'blender': (2, 79, 0),
     'wiki_url': '',
     'tracker_url': '',
