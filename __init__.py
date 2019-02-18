@@ -18,30 +18,48 @@ bl_info = {
 IS_LEGACY = (bpy.app.version < (2, 80, 0))
 REGION = "TOOLS" if IS_LEGACY else "UI"
 
-bpy.types.Scene.remove_unnecessary_objects = bpy.props.BoolProperty(
-    name="余計なオブジェクトの削除",
-    default=True,
-    description="メッシュ、アーマチュア以外のオブジェクトと非表示状態になってるオブジェクトの削除を行う。")
-bpy.types.Scene.rename_uvmaps = bpy.props.BoolProperty(
-    name="UVMapのリネーム",
-    default=True,
-    description=""
-    "ユーザ設定の翻訳で「新しいデータ」にチェックが入っている場合、英語(UVMap)と日本語(UVマップ)のUVマップがそれぞれ存在する場合がある。\n"
-    "メッシュオブジェクトの結合を行った時、このUVMapが混在していると日本語か英語のUVマップどちらか片方が反映できなくなる場合がある。\n"
-    "UVMapのリネームをオンにしているとオブジェクトの結合を行う前にすべてのUVMapを 'UVMap' にリネームする。")
-bpy.types.Scene.remove_unselected_layer = bpy.props.BoolProperty(
-    name="非アクティブレイヤーのオブジェクト削除",
-    default=True,
-    description="非アクティブレイヤーのオブジェクトを削除する。")
-bpy.types.Scene.remove_unnecessary_bones = bpy.props.BoolProperty(
-    name="非選択アーマチュアレイヤーのボーン削除",
-    default=True,
-    description="非選択状態のアーマチュアレイヤーにあるボーンの削除を行う。")
-if not IS_LEGACY:
-    bpy.types.Scene.remove_empty_collection = bpy.props.BoolProperty(
-        name="空のコレクションの削除",
-        default=True,
-        description="結合などや削除で空になったコレクションを削除する。")
+
+def select(obj, value):
+    get_scene_objects().active = obj
+    if IS_LEGACY:
+        obj.select = value
+    else:
+        obj.select_set(value)
+
+
+def get_scene_objects():
+    if IS_LEGACY:
+        return bpy.context.scene.objects
+    else:
+        return bpy.context.window.view_layer.objects
+
+
+def set_active_object(obj):
+    if IS_LEGACY:
+        bpy.context.scene.objects.active = obj
+    else:
+        bpy.context.window.view_layer.objects.active = obj
+
+
+def get_active_object():
+    if IS_LEGACY:
+        return bpy.context.scene.objects.active
+    else:
+        return bpy.context.window.view_layer.objects.active
+
+
+def is_hide(obj):
+    if IS_LEGACY:
+        return obj.hide
+    else:
+        return obj.hide_viewport
+
+
+def set_hide(obj, value):
+    if IS_LEGACY:
+        obj.hide = value
+    else:
+        obj.hide_viewport = value
 
 
 class OBJECT_OT_OptimizeButton(bpy.types.Operator):
@@ -50,43 +68,13 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
     bl_description = 'FBXエクスポートのためにオブジェクトの整理を行う。'
     bl_options = {'REGISTER', 'UNDO'}
 
-    def select(self, obj, value):
-        self.getSceneObjects().active = obj
-        if IS_LEGACY:
-            obj.select = value
-        else:
-            obj.select_set(value)
-
-    def getSceneObjects(self):
-        if IS_LEGACY:
-            return bpy.context.scene.objects
-        else:
-            return bpy.context.window.view_layer.objects
-
-    def set_active_object(self, obj):
-        if IS_LEGACY:
-            bpy.context.scene.objects.active = obj
-        else:
-            bpy.context.window.view_layer.objects.active = obj
-
-    def isHide(self, obj):
-        if IS_LEGACY:
-            return obj.hide
-        else:
-            return obj.hide_viewport
-
-    def setHide(self, obj, value):
-        if IS_LEGACY:
-            obj.hide = value
-        else:
-            obj.hide_viewport = value
-
     def execute(self, context):
         scene = context.scene
+        props = scene.tmc_props
         prev = None
         meshes = []
         deletes = []
-        objects = self.getSceneObjects()
+        objects = get_scene_objects()
         active = objects.active
 
         if not active:
@@ -100,12 +88,12 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                 continue
 
             if prev:
-                self.select(prev, False)
-            self.select(obj, True)
+                select(prev, False)
+            select(obj, True)
             prev = obj
 
             # メッシュとアーマチュア以外か不可視状態のオブジェクトは削除
-            if obj.type != 'MESH' or self.isHide(obj):
+            if obj.type != 'MESH' or is_hide(obj):
                 print("{} - Skip (Remove)".format(obj.name))
                 deletes.append(obj)
                 continue
@@ -114,7 +102,7 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
             self.apply_all_modifier(obj)
 
         # UVマップのリネーム
-        if scene.rename_uvmaps:
+        if props.rename_uvmaps:
             self.rename_uvmaps()
 
         # メッシュオブジェクトの結合
@@ -125,19 +113,19 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
         # オブジェクトは不可視状態のままだと削除できてないので解除する必要がある
         # (Pythonコンソールだと不可視のまま削除できる)
         #
-        if scene.remove_unnecessary_objects:
+        if props.remove_unnecessary_objects:
             print("Delete all hide objects")
             bpy.ops.object.select_all(action='DESELECT')
             for obj in deletes:
                 print("\t{} - Delete".format(obj.name))
-                self.setHide(obj, False)
-                self.select(obj, True)
+                set_hide(obj, False)
+                select(obj, True)
             bpy.ops.object.delete()
 
         #
         # 非選択レイヤー/コレクションのオブジェクトを削除
         #
-        if scene.remove_unselected_layer:
+        if props.remove_unselected_layer:
             if IS_LEGACY:
                 self.remove_unselected_leyer(scene)
             else:
@@ -149,14 +137,14 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
         print("Merge vertex group")
         bpy.ops.object.select_all(action='DESELECT')
         vg_pattern = re.compile(r'^Merge\.')
-        for obj in self.getSceneObjects():
+        for obj in get_scene_objects():
             print("Mesh: {} ({})".format(obj.name, obj.type))
             if obj.type not in 'MESH':
                 continue
             for idx in range(0, len(obj.vertex_groups)):
                 vg = obj.vertex_groups[idx]
                 if vg_pattern.search(vg.name):
-                    self.select(obj, True)
+                    select(obj, True)
                     bpy.ops.object.mode_set(mode='EDIT')
 
                     print("Merge mesh: {}".format(vg.name))
@@ -170,16 +158,16 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
         #
         # 非選択アーマチュアレイヤーのボーンを削除
         #
-        if scene.remove_unnecessary_bones:
+        if props.remove_unnecessary_bones:
             print("Delete all unselected armature layer bones")
             removed_bones = []
             for armature in bpy.data.objects:
                 if armature.type != "ARMATURE":
                     continue
 
-                self.select(armature, True)
-                if self.isHide(armature):
-                    self.setHide(armature, False)
+                select(armature, True)
+                if is_hide(armature):
+                    set_hide(armature, False)
                 bpy.ops.object.mode_set(mode='EDIT')
 
                 # 非選択アーマチュアレイヤーのボーンを削除
@@ -211,17 +199,17 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                 for (child, parent) in removed_bones:
                     if obj.vertex_groups.get(child) and obj.vertex_groups.get(parent):
                         print("Dissolve: {} -> {}".format(child, parent))
-                        self.set_active_object(obj)
+                        set_active_object(obj)
                         self.dissolve(obj, obj.vertex_groups.get(child),
                                       obj.vertex_groups.get(parent))
 
-        if not IS_LEGACY and scene.remove_empty_collection:
+        if not IS_LEGACY and props.remove_empty_collection:
             self.remove_empty_collection(scene)
 
         # active
         if active in meshes:
             bpy.ops.object.select_all(action='DESELECT')
-            self.select(active, True)
+            select(active, True)
 
         return {'FINISHED'}
 
@@ -233,13 +221,13 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
             if mesh_pattern.search(obj.name):
                 continue
             print("\t{} - Join".format(obj.name))
-            self.select(obj, True)
+            select(obj, True)
         if active in meshes:
-            self.select(active, True)
+            select(active, True)
         bpy.ops.object.join()
 
     def apply_all_modifier(self, obj):
-        print("{} - {} ({})".format(obj.name, obj.type, self.isHide(obj)))
+        print("{} - {} ({})".format(obj.name, obj.type, is_hide(obj)))
         if obj.data.shape_keys and hasattr(bpy.ops.object, "apply_all_modifier"):
             for mod in obj.modifiers:
                 if mod.type in 'ARMATURE':
@@ -293,7 +281,7 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
     def remove_unselected_leyer(self, scene):
         print("Delete all unselected layer objects")
         bpy.ops.object.select_all(action='DESELECT')
-        for obj in self.getSceneObjects():
+        for obj in get_scene_objects():
             selected = False
             for layer_index in range(len(scene.layers)):
                 if scene.layers[layer_index] and obj.layers[layer_index]:
@@ -303,14 +291,14 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                 print("\t{} - Delete".format(obj.name))
                 for object_layer_index in range(len(obj.layers)):
                     obj.layers[object_layer_index] = True
-                self.setHide(obj, False)
-                self.select(obj, True)
+                set_hide(obj, False)
+                select(obj, True)
         bpy.ops.object.delete()
 
     # for Blender 2.7x
     def rename_uvmaps(self):
         print("Rename UVMaps")
-        for obj in self.getSceneObjects():
+        for obj in get_scene_objects():
             if obj.type not in 'MESH':
                 continue
             for uvmap in obj.data.uv_layers:
@@ -326,6 +314,32 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                     texture_slot.uv_layer = 'UVMap'
 
 
+class TareminMeshCombinerProps(bpy.types.PropertyGroup):
+    remove_unnecessary_objects = bpy.props.BoolProperty(
+        name="余計なオブジェクトの削除",
+        default=True,
+        description="メッシュ、アーマチュア以外のオブジェクトと非表示状態になってるオブジェクトの削除を行う。")
+    rename_uvmaps = bpy.props.BoolProperty(
+        name="UVMapのリネーム",
+        default=True,
+        description=""
+        "ユーザ設定の翻訳で「新しいデータ」にチェックが入っている場合、英語(UVMap)と日本語(UVマップ)のUVマップがそれぞれ存在する場合がある。\n"
+        "メッシュオブジェクトの結合を行った時、このUVMapが混在していると日本語か英語のUVマップどちらか片方が反映できなくなる場合がある。\n"
+        "UVMapのリネームをオンにしているとオブジェクトの結合を行う前にすべてのUVMapを 'UVMap' にリネームする。")
+    remove_unselected_layer = bpy.props.BoolProperty(
+        name="非アクティブレイヤーのオブジェクト削除",
+        default=True,
+        description="非アクティブレイヤーのオブジェクトを削除する。")
+    remove_unnecessary_bones = bpy.props.BoolProperty(
+        name="非選択アーマチュアレイヤーのボーン削除",
+        default=True,
+        description="非選択状態のアーマチュアレイヤーにあるボーンの削除を行う。")
+    remove_empty_collection = bpy.props.BoolProperty(
+        name="空のコレクションの削除",
+        default=True,
+        description="結合などや削除で空になったコレクションを削除する。")
+
+
 class VIEW3D_PT_TareminPanel(bpy.types.Panel):
     bl_label = 'Taremin Blender Plugin'
     bl_region_type = REGION
@@ -336,20 +350,35 @@ class VIEW3D_PT_TareminPanel(bpy.types.Panel):
         layout = self.layout
         box = layout.box()
         col = box.column(align=True)
+        invalid_context = False
+        props = context.scene.tmc_props
+
+        if context.mode != 'OBJECT':
+            row = col.row(align=True)
+            row.label(text='オブジェクトモードにしてください')
+            invalid_context = True
+
+        if get_active_object().type != 'MESH':
+            row = col.row(align=True)
+            row.label(text='結合先のメッシュオブジェクトをアクティブにしてください')
+            invalid_context = True
+
+        if invalid_context:
+            return
 
         row = col.row(align=True)
         row.label(text='最適化')
         row = col.row(align=True)
-        row.prop(context.scene, 'remove_unnecessary_objects')
+        row.prop(props, 'remove_unnecessary_objects')
         row = col.row(align=True)
-        row.prop(context.scene, 'remove_unselected_layer')
+        row.prop(props, 'remove_unselected_layer')
         row = col.row(align=True)
-        row.prop(context.scene, 'rename_uvmaps')
+        row.prop(props, 'rename_uvmaps')
         row = col.row(align=True)
-        row.prop(context.scene, 'remove_unnecessary_bones')
+        row.prop(props, 'remove_unnecessary_bones')
         row = col.row(align=True)
         if not IS_LEGACY:
-            row.prop(context.scene, 'remove_empty_collection')
+            row.prop(props, 'remove_empty_collection')
             row = col.row(align=True)
         row.label(text='結合先のオブジェクトをアクティブにしてから最適化を行ってください。')
         row = col.row(align=True)
@@ -359,17 +388,20 @@ class VIEW3D_PT_TareminPanel(bpy.types.Panel):
 classesToRegister = [
     VIEW3D_PT_TareminPanel,
     OBJECT_OT_OptimizeButton,
+    TareminMeshCombinerProps
 ]
 
 
 def register():
     for value in classesToRegister:
         bpy.utils.register_class(value)
+    bpy.types.Scene.tmc_props = bpy.props.PointerProperty(type=TareminMeshCombinerProps)
 
 
 def unregister():
     for value in classesToRegister:
         bpy.utils.unregister_class(value)
+    del bpy.types.Scene.tmc_props
 
 
 if __name__ == '__main__':
