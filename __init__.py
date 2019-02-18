@@ -3,12 +3,12 @@ import bpy
 import numpy
 
 bl_info = {
-    'name': 'Taremin Blender Plugin',
+    'name': 'Taremin Mesh Combiner',
     'category': '3D View',
     'author': 'Taremin',
     'location': 'View 3D > Tool Shelf > Taremin',
-    'description': "Taremin's private plugin",
-    'version': [0, 0, 6],
+    'description': "mesh combine tool for my vrchat avatar",
+    'version': [0, 0, 7],
     'blender': (2, 80, 0),
     'wiki_url': '',
     'tracker_url': '',
@@ -341,10 +341,10 @@ class TareminMeshCombinerProps(bpy.types.PropertyGroup):
 
 
 class VIEW3D_PT_TareminPanel(bpy.types.Panel):
-    bl_label = 'Taremin Blender Plugin'
+    bl_label = 'Taremin Mesh Combiner'
     bl_region_type = REGION
     bl_space_type = 'VIEW_3D'
-    bl_category = 'Taremin Blender Plugin'
+    bl_category = 'Taremin Mesh Combiner'
 
     def draw(self, context):
         layout = self.layout
