@@ -52,7 +52,7 @@ def is_hide(obj):
     if IS_LEGACY:
         return obj.hide
     else:
-        return obj.hide_viewport
+        return obj.hide_viewport or not obj.visible_get()
 
 
 def set_hide(obj, value):
@@ -118,8 +118,11 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
             bpy.ops.object.select_all(action='DESELECT')
             for obj in deletes:
                 print("\t{} - Delete".format(obj.name))
+                if not IS_LEGACY:
+                    obj.hide_select = False
                 set_hide(obj, False)
                 select(obj, True)
+            bpy.ops.object.hide_view_clear()
             bpy.ops.object.delete()
 
         #
@@ -271,11 +274,10 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
     # for Blender 2.8
     def remove_hidden_collection(self, context):
         print("Delete all hidden collection")
-        for collection in context.scene.collection.children:
-            if not collection.hide_viewport:
-                continue
-            print("\t{} - Delete Collection".format(collection.name))
-            context.scene.collection.children.unlink(collection)
+        for collection in bpy.context.view_layer.layer_collection.children:
+            if collection.hide_viewport or collection.exclude:
+                print("\t{} - Delete Collection".format(collection.name))
+                context.scene.collection.children.unlink(collection.collection)
 
     # for Blender 2.7x
     def remove_unselected_leyer(self, scene):

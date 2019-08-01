@@ -1,4 +1,4 @@
-# Taremin Blender Plugin
+# Taremin Mesh Combiner
 
 ## なにこれ？
 
