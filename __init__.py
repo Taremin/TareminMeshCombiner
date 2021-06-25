@@ -6,133 +6,146 @@ bl_info = {
     'name': 'Taremin Mesh Combiner',
     'category': '3D View',
     'author': 'Taremin',
-    'location': 'View 3D > Tool Shelf > Taremin',
-    'description': "mesh combine tool for my vrchat avatar",
-    'version': [0, 0, 7],
+    'location': 'View 3D > UI > Taremin',
+    'description': "combine mesh tool",
+    'version': (0, 1, 0),
     'blender': (2, 80, 0),
     'wiki_url': '',
     'tracker_url': '',
     'warning': '',
 }
 
-IS_LEGACY = (bpy.app.version < (2, 80, 0))
-REGION = "TOOLS" if IS_LEGACY else "UI"
-
 
 def select(obj, value):
     get_scene_objects().active = obj
-    if IS_LEGACY:
-        obj.select = value
-    else:
-        obj.select_set(value)
+    obj.select_set(value)
 
 
 def get_scene_objects():
-    if IS_LEGACY:
-        return bpy.context.scene.objects
-    else:
-        return bpy.context.window.view_layer.objects
+    return bpy.context.window.view_layer.objects
 
 
 def set_active_object(obj):
-    if IS_LEGACY:
-        bpy.context.scene.objects.active = obj
-    else:
-        bpy.context.window.view_layer.objects.active = obj
+    bpy.context.window.view_layer.objects.active = obj
 
 
 def get_active_object():
-    if IS_LEGACY:
-        return bpy.context.scene.objects.active
-    else:
-        return bpy.context.window.view_layer.objects.active
+    return bpy.context.window.view_layer.objects.active
 
 
 def is_hide(obj):
-    if IS_LEGACY:
-        return obj.hide
-    else:
-        return obj.hide_viewport or not obj.visible_get()
+    return obj.hide_viewport or not obj.visible_get()
 
 
 def set_hide(obj, value):
-    if IS_LEGACY:
-        obj.hide = value
-    else:
-        obj.hide_viewport = value
+    obj.hide_viewport = value
 
 
-class OBJECT_OT_OptimizeButton(bpy.types.Operator):
-    bl_idname = 'taremin.optimize'
-    bl_label = '最適化'
-    bl_description = 'FBXエクスポートのためにオブジェクトの整理を行う。'
+class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
+    bl_idname = 'taremin.combine_mesh'
+    bl_label = '結合'
+    bl_description = 'オブジェクトの結合と不要なオブジェクトの削除を行う'
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         scene = context.scene
         props = scene.tmc_props
-        prev = None
         meshes = []
-        deletes = []
         objects = get_scene_objects()
         active = objects.active
 
-        if not active:
-            return
+        root_layer_collection = bpy.context.view_layer.layer_collection
+        dest_col = bpy.data.collections.new(
+            props.output_collection)
+        root_layer_collection.collection.children.link(dest_col)
 
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in objects:
-            # アーマチュアはスキップ
-            if obj.type in 'ARMATURE':
-                print("{} - Skip".format(obj.name))
-                continue
+        join_meshes = []
 
-            if prev:
-                select(prev, False)
-            select(obj, True)
-            prev = obj
+        def walkdown_collection(collection, path=[], depth=0):
+            path = path + [collection]
+            for obj in collection.collection.objects:
+                if obj.type == 'ARMATURE':
+                    try:
+                        dest_col.objects.link(obj)
+                    except RuntimeError:
+                        pass  # obj is already exists in dest_col
+                if obj.type == 'MESH':
+                    if not is_hide(obj):
+                        print("  " * depth + "[OBJ]" +
+                              obj.name + " - " + obj.type)
+                        self.apply_all_modifier(obj)
+                        join_meshes.append((obj, path))
 
-            # メッシュとアーマチュア以外か不可視状態のオブジェクトは削除
-            if obj.type != 'MESH' or is_hide(obj):
-                print("{} - Skip (Remove)".format(obj.name))
-                deletes.append(obj)
-                continue
+            for child in collection.children:
+                if child.hide_viewport or child.exclude:
+                    pass
+                else:
+                    walkdown_collection(child, path, depth+1)
 
-            meshes.append(obj)
-            self.apply_all_modifier(obj)
+        walkdown_collection(root_layer_collection)
 
-        # UVマップのリネーム
-        if props.rename_uvmaps:
-            self.rename_uvmaps()
+        # join meshes
+        join_dict = {}
+        for obj, path in join_meshes:
+            match = False
+            for group in props.combine_groups:
+                name = group.object_name
+                if group.group_type == 'COLLECTION':
+                    path_names = [collection.name for collection in path]
+                    if len(path_names) > 0 and group.collection.name == path_names[-1]:
+                        if name not in join_dict:
+                            join_dict[name] = []
+                        join_dict[name].append(obj)
+                        match = True
+                        break
+                elif group.group_type == 'COLLECTION_RECURSIVE':
+                    path_names = [collection.name for collection in path]
+                    if group.collection.name in path_names:
+                        if name not in join_dict:
+                            join_dict[name] = []
+                        join_dict[name].append(obj)
+                        match = True
+                        break
+                elif group.group_type == 'REGEXP':
+                    pattern = re.compile(group.regexp)
+                    if pattern.match(obj.name):
+                        name = pattern.sub(name, obj.name)
+                        if name not in join_dict:
+                            join_dict[name] = []
+                        join_dict[name].append(obj)
+                        match = True
+                        break
 
-        # メッシュオブジェクトの結合
-        self.join_mesh(active, meshes)
+            # default
+            if not match:
+                name = props.output_default_object
+                if name not in join_dict:
+                    join_dict[name] = []
+                join_dict[name].append(obj)
 
-        #
-        # 不可視状態になってる or メッシュ以外のオブジェクトの削除
-        # オブジェクトは不可視状態のままだと削除できてないので解除する必要がある
-        # (Pythonコンソールだと不可視のまま削除できる)
-        #
-        if props.remove_unnecessary_objects:
-            print("Delete all hide objects")
-            bpy.ops.object.select_all(action='DESELECT')
-            for obj in deletes:
-                print("\t{} - Delete".format(obj.name))
-                if not IS_LEGACY:
-                    obj.hide_select = False
-                set_hide(obj, False)
-                select(obj, True)
-            bpy.ops.object.hide_view_clear()
-            bpy.ops.object.delete()
+        for dest_name, meshes in join_dict.items():
+            mesh = bpy.data.meshes.new(dest_name)
+            dest_obj = bpy.data.objects.new(name=dest_name, object_data=mesh)
 
-        #
-        # 非選択レイヤー/コレクションのオブジェクトを削除
-        #
-        if props.remove_unselected_layer:
-            if IS_LEGACY:
-                self.remove_unselected_leyer(scene)
-            else:
-                self.remove_hidden_collection(context)
+            # add to scene
+            dest_col.objects.link(dest_obj)
+
+            # add armature modifier
+            for target in self.get_armature_modifier_targets(meshes):
+                modifier = dest_obj.modifiers.new(
+                    name='Armature', type='ARMATURE')
+                modifier.object = bpy.data.objects[target]
+
+            print("JOIN:", dest_obj, meshes)
+            self.join_mesh(dest_obj, meshes)
+
+        # remove all collections without destination collection
+        for layer_collection in root_layer_collection.children:
+            if layer_collection.collection is not dest_col:
+                root_layer_collection.collection.children.unlink(
+                    layer_collection.collection)
+        for obj in root_layer_collection.collection.objects:
+            root_layer_collection.collection.objects.unlink(obj)
 
         #
         # "Merge." から始まる頂点グループの重複頂点の削除で結合する
@@ -154,7 +167,7 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                     bpy.ops.mesh.select_all(action='DESELECT')
                     obj.vertex_groups.active_index = vg.index
                     bpy.ops.object.vertex_group_select()
-                    bpy.ops.mesh.remove_doubles()
+                    bpy.ops.mesh.remove_doubles(threshold=0.0)
 
                     bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -168,9 +181,10 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                 if armature.type != "ARMATURE":
                     continue
 
-                select(armature, True)
                 if is_hide(armature):
                     set_hide(armature, False)
+                print("Armature: {}".format(armature.name))
+                select(armature, True)
                 bpy.ops.object.mode_set(mode='EDIT')
 
                 # 非選択アーマチュアレイヤーのボーンを削除
@@ -206,32 +220,30 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                         self.dissolve(obj, obj.vertex_groups.get(child),
                                       obj.vertex_groups.get(parent))
 
-        if not IS_LEGACY and props.remove_empty_collection:
+        if props.remove_empty_collection:
             self.remove_empty_collection(scene)
 
         # active
         if active in meshes:
             bpy.ops.object.select_all(action='DESELECT')
-            select(active, True)
+            #select(active, True)
 
         return {'FINISHED'}
 
     def join_mesh(self, active, meshes):
         print("Join all mesh objects")
         bpy.ops.object.select_all(action='DESELECT')
-        mesh_pattern = re.compile(r'\.NoMerge$')
         for obj in meshes:
-            if mesh_pattern.search(obj.name):
-                continue
             print("\t{} - Join".format(obj.name))
             select(obj, True)
-        if active in meshes:
-            select(active, True)
+        select(active, True)
         bpy.ops.object.join()
 
     def apply_all_modifier(self, obj):
+        bpy.ops.object.select_all(action='DESELECT')
+        select(obj, True)
         print("{} - {} ({})".format(obj.name, obj.type, is_hide(obj)))
-        if obj.data.shape_keys and hasattr(bpy.ops.object, "apply_all_modifier"):
+        if obj.data.shape_keys and hasattr(bpy.types, "OBJECT_OT_apply_all_modifier"):
             for mod in obj.modifiers:
                 if mod.type in 'ARMATURE':
                     mod.show_viewport = False
@@ -247,6 +259,14 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                     bpy.ops.object.modifier_apply(modifier=mod.name)
                 else:
                     print("\t{} - Skip".format(mod.type))
+
+    def get_armature_modifier_targets(self, mesh_objects):
+        modifier_targets = set([])
+        for obj in mesh_objects:
+            for modifier in obj.modifiers:
+                if modifier.type in 'ARMATURE':
+                    modifier_targets.add(modifier.object.name)
+        return modifier_targets
 
     def remove_empty_collection(self, scene):
         print("Delete all empty collection")
@@ -271,125 +291,221 @@ class OBJECT_OT_OptimizeButton(bpy.types.Operator):
                                     'ADD')
             child_vertex_group.remove(vi)
 
-    # for Blender 2.8
-    def remove_hidden_collection(self, context):
+    def remove_hidden_collection(self, context, parent):
         print("Delete all hidden collection")
-        for collection in bpy.context.view_layer.layer_collection.children:
+        for collection in parent.children:
             if collection.hide_viewport or collection.exclude:
-                print("\t{} - Delete Collection".format(collection.name))
-                context.scene.collection.children.unlink(collection.collection)
+                print(
+                    "\t{} - Delete Collection from {}".format(collection.name, parent.name))
+                #print("\t{} - Delete Collection".format(collection.name))
+                parent.collection.children.unlink(collection.collection)
+            else:
+                self.remove_hidden_collection(context, collection)
 
-    # for Blender 2.7x
-    def remove_unselected_leyer(self, scene):
-        print("Delete all unselected layer objects")
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in get_scene_objects():
-            selected = False
-            for layer_index in range(len(scene.layers)):
-                if scene.layers[layer_index] and obj.layers[layer_index]:
-                    selected = True
-                    break
-            if not selected:
-                print("\t{} - Delete".format(obj.name))
-                for object_layer_index in range(len(obj.layers)):
-                    obj.layers[object_layer_index] = True
-                set_hide(obj, False)
-                select(obj, True)
-        bpy.ops.object.delete()
 
-    # for Blender 2.7x
-    def rename_uvmaps(self):
-        print("Rename UVMaps")
-        for obj in get_scene_objects():
-            if obj.type not in 'MESH':
-                continue
-            for uvmap in obj.data.uv_layers:
-                print("\tRename {} - {} -> {}".format(
-                    obj.name, uvmap.name, 'UVMap'))
-                uvmap.name = 'UVMap'
+class TareminMeshCombinerGroupSettings(bpy.types.PropertyGroup):
+    group_type: bpy.props.EnumProperty(
+        items=[
+            ("REGEXP", "Regexp", "", 0),
+            ("COLLECTION", "Collection", "", 1),
+            ("COLLECTION_RECURSIVE", "Collection(Recursive)", "", 2),
+        ])
+    regexp: bpy.props.StringProperty()
+    collection: bpy.props.PointerProperty(
+        type=bpy.types.Collection
+    )
+    object_name: bpy.props.StringProperty()
 
-        if IS_LEGACY:
-            for material in bpy.data.materials:
-                for texture_slot in material.texture_slots:
-                    if texture_slot is None:
-                        continue
-                    texture_slot.uv_layer = 'UVMap'
+
+class TAREMIN_MESH_COMBINER_OT_GroupSettings_Add(bpy.types.Operator):
+    bl_idname = "taremin.mesh_combiner_group_settings_add"
+    bl_label = "Remove Entry"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.tmc_props
+
+        props.combine_groups.add()
+        props.combine_group_index = len(props.combine_groups) - 1
+
+        return {'FINISHED'}
+
+
+class TAREMIN_MESH_COMBINER_OT_GroupSettings_Remove(bpy.types.Operator):
+    bl_idname = "taremin.mesh_combiner_group_settings_remove"
+    bl_label = "Remove Entry"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.tmc_props
+
+        props.combine_groups.remove(props.combine_group_index)
+        max_index = len(props.combine_groups) - 1
+
+        if props.combine_group_index > max_index:
+            props.combine_group_index = max_index
+
+        return {'FINISHED'}
+
+
+class TAREMIN_MESH_COMBINER_OT_GroupSettings_Up(bpy.types.Operator):
+    bl_idname = "taremin.mesh_combiner_group_settings_up"
+    bl_label = "Up Entry"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.tmc_props
+        return settings.combine_group_index > 0
+
+    def execute(self, context):
+        settings = context.scene.tmc_props
+        index = settings.combine_group_index
+        settings.combine_groups.move(index, index - 1)
+        settings.combine_group_index = index - 1
+        return {'FINISHED'}
+
+
+class TAREMIN_MESH_COMBINER_OT_GroupSettings_Down(bpy.types.Operator):
+    bl_idname = "taremin.mesh_combiner_group_settings_down"
+    bl_label = "Down Entry"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.tmc_props
+        max_index = len(settings.combine_groups) - 1
+        return settings.combine_group_index < max_index
+
+    def execute(self, context):
+        settings = context.scene.tmc_props
+        index = settings.combine_group_index
+        settings.combine_groups.move(index, index + 1)
+        settings.combine_group_index = index + 1
+
+        return {'FINISHED'}
+
+
+class TAREMIN_MESH_COMBINER_UL_GroupSettings(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        row = layout.row()
+        col = row.column(align=True)
+
+        col.prop(item, "group_type", text="")
+
+        col = row.column()
+        if item.group_type == "REGEXP":
+            col.prop(item, "regexp", text="")
+        elif item.group_type in ("COLLECTION", "COLLECTION_RECURSIVE"):
+            col.prop(item, "collection", text="")
+        else:
+            raise ValueError(f"wrong group type: {item.group_type}")
+
+        col = row.column()
+        col.prop(item, "object_name", text="")
 
 
 class TareminMeshCombinerProps(bpy.types.PropertyGroup):
-    remove_unnecessary_objects = bpy.props.BoolProperty(
-        name="余計なオブジェクトの削除",
-        default=True,
-        description="メッシュ、アーマチュア以外のオブジェクトと非表示状態になってるオブジェクトの削除を行う。")
-    rename_uvmaps = bpy.props.BoolProperty(
-        name="UVMapのリネーム",
-        default=True,
-        description=""
-        "ユーザ設定の翻訳で「新しいデータ」にチェックが入っている場合、英語(UVMap)と日本語(UVマップ)のUVマップがそれぞれ存在する場合がある。\n"
-        "メッシュオブジェクトの結合を行った時、このUVMapが混在していると日本語か英語のUVマップどちらか片方が反映できなくなる場合がある。\n"
-        "UVMapのリネームをオンにしているとオブジェクトの結合を行う前にすべてのUVMapを 'UVMap' にリネームする。")
-    remove_unselected_layer = bpy.props.BoolProperty(
-        name="非アクティブレイヤーのオブジェクト削除",
-        default=True,
-        description="非アクティブレイヤーのオブジェクトを削除する。")
-    remove_unnecessary_bones = bpy.props.BoolProperty(
+    output_collection: bpy.props.StringProperty(
+        name="Output Collection", default="Combined Objects")
+    output_default_object: bpy.props.StringProperty(
+        name="Default Output Object", default="Combined")
+    remove_unnecessary_bones: bpy.props.BoolProperty(
         name="非選択アーマチュアレイヤーのボーン削除",
         default=True,
-        description="非選択状態のアーマチュアレイヤーにあるボーンの削除を行う。")
-    remove_empty_collection = bpy.props.BoolProperty(
+        description="非選択状態のアーマチュアレイヤーにあるボーンの削除を行う")
+    remove_empty_collection: bpy.props.BoolProperty(
         name="空のコレクションの削除",
         default=True,
-        description="結合などや削除で空になったコレクションを削除する。")
+        description="結合などや削除で空になったコレクションを削除する")
+    groups_folding: bpy.props.BoolProperty()
+    combine_groups: bpy.props.CollectionProperty(
+        type=TareminMeshCombinerGroupSettings
+    )
+    combine_group_index: bpy.props.IntProperty()
 
 
 class VIEW3D_PT_TareminPanel(bpy.types.Panel):
     bl_label = 'Taremin Mesh Combiner'
-    bl_region_type = REGION
+    bl_region_type = "UI"
     bl_space_type = 'VIEW_3D'
     bl_category = 'Taremin Mesh Combiner'
 
     def draw(self, context):
-        layout = self.layout
-        box = layout.box()
-        col = box.column(align=True)
-        invalid_context = False
         props = context.scene.tmc_props
+        layout = self.layout
+        invalid_context = False
 
         if context.mode != 'OBJECT':
-            row = col.row(align=True)
+            row = layout.row()
             row.label(text='オブジェクトモードにしてください')
-            invalid_context = True
-
-        if get_active_object().type != 'MESH':
-            row = col.row(align=True)
-            row.label(text='結合先のメッシュオブジェクトをアクティブにしてください')
             invalid_context = True
 
         if invalid_context:
             return
 
-        row = col.row(align=True)
-        row.label(text='最適化')
-        row = col.row(align=True)
-        row.prop(props, 'remove_unnecessary_objects')
-        row = col.row(align=True)
-        row.prop(props, 'remove_unselected_layer')
-        row = col.row(align=True)
-        row.prop(props, 'rename_uvmaps')
-        row = col.row(align=True)
+        row = layout.row(align=True)
+        row.prop(props, 'output_collection')
+        row = layout.row(align=True)
+        row.prop(props, 'output_default_object')
+        row = layout.row(align=True)
         row.prop(props, 'remove_unnecessary_bones')
-        row = col.row(align=True)
-        if not IS_LEGACY:
-            row.prop(props, 'remove_empty_collection')
-            row = col.row(align=True)
-        row.label(text='結合先のオブジェクトをアクティブにしてから最適化を行ってください。')
-        row = col.row(align=True)
-        row.operator(OBJECT_OT_OptimizeButton.bl_idname)
+
+        layout.separator()
+
+        row = layout.row()
+        row.prop(
+            props, "groups_folding",
+            icon="TRIA_RIGHT" if props.groups_folding else "TRIA_DOWN",
+            icon_only=True
+        )
+        row.label(text="Groups")
+
+        if not props.groups_folding:
+            row = layout.row()
+            col = row.column()
+            col.template_list(
+                "TAREMIN_MESH_COMBINER_UL_GroupSettings",
+                "",
+                props,
+                "combine_groups",
+                props,
+                "combine_group_index",
+                type="DEFAULT"
+            )
+            col = row.column(align=True)
+            col.operator(
+                TAREMIN_MESH_COMBINER_OT_GroupSettings_Add.bl_idname, text="", icon="ADD")
+            col.operator(
+                TAREMIN_MESH_COMBINER_OT_GroupSettings_Remove.bl_idname, text="", icon="REMOVE")
+            col.separator()
+            col.operator(
+                TAREMIN_MESH_COMBINER_OT_GroupSettings_Up.bl_idname, text="", icon="TRIA_UP")
+            col.operator(
+                TAREMIN_MESH_COMBINER_OT_GroupSettings_Down.bl_idname, text="", icon="TRIA_DOWN")
+
+        layout.separator()
+
+        if not hasattr(bpy.types, "OBJECT_OT_apply_all_modifier"):
+            box = layout.box()
+            row = box.row()
+            row.label(
+                text="ApplyModifierアドオンがないためシェイプキーのあるオブジェクトでモディファイアの適用に失敗する可能性があります")
+
+        row = layout.row()
+        col = row.row(align=True)
+        col.operator(TAREMIN_MESH_COMBINER_OT_CombineMesh.bl_idname)
 
 
 classesToRegister = [
     VIEW3D_PT_TareminPanel,
-    OBJECT_OT_OptimizeButton,
+    TAREMIN_MESH_COMBINER_OT_GroupSettings_Add,
+    TAREMIN_MESH_COMBINER_OT_GroupSettings_Remove,
+    TAREMIN_MESH_COMBINER_OT_GroupSettings_Up,
+    TAREMIN_MESH_COMBINER_OT_GroupSettings_Down,
+    TAREMIN_MESH_COMBINER_OT_CombineMesh,
+    TareminMeshCombinerGroupSettings,
+    TAREMIN_MESH_COMBINER_UL_GroupSettings,
     TareminMeshCombinerProps
 ]
 
@@ -397,7 +513,8 @@ classesToRegister = [
 def register():
     for value in classesToRegister:
         bpy.utils.register_class(value)
-    bpy.types.Scene.tmc_props = bpy.props.PointerProperty(type=TareminMeshCombinerProps)
+    bpy.types.Scene.tmc_props = bpy.props.PointerProperty(
+        type=TareminMeshCombinerProps)
 
 
 def unregister():
