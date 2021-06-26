@@ -6,7 +6,7 @@ class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
     bl_label = 'Taremin Mesh Combiner'
     bl_region_type = "UI"
     bl_space_type = 'VIEW_3D'
-    bl_category = 'Taremin Mesh Combiner'
+    bl_category = 'Taremin'
 
     def draw(self, context):
         props = util.get_settings(context)
