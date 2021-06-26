@@ -261,7 +261,6 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
             if collection.hide_viewport or collection.exclude:
                 print(
                     "\t{} - Delete Collection from {}".format(collection.name, parent.name))
-                #print("\t{} - Delete Collection".format(collection.name))
                 parent.collection.children.unlink(collection.collection)
             else:
                 self.remove_hidden_collection(context, collection)
