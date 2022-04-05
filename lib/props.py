@@ -15,6 +15,10 @@ class TareminMeshCombinerProps(bpy.types.PropertyGroup):
         name="空のコレクションの削除",
         default=True,
         description="結合などや削除で空になったコレクションを削除する")
+    make_single_user: bpy.props.BoolProperty(
+        name="結合オブジェクトのシングルユーザー化",
+        default=True,
+        description="モディファイアの適用前にオブジェクトのシングルユーザー化を行う")
     groups_folding: bpy.props.BoolProperty()
     combine_groups: bpy.props.CollectionProperty(
         type=group_settings.TareminMeshCombinerGroupSettings

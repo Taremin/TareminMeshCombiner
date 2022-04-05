@@ -25,7 +25,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
         join_meshes = []
 
-        def walkdown_collection(collection, path=[], depth=0):
+        def walkdown_collection(context, collection, path=[], depth=0):
             path = path + [collection]
             for obj in collection.collection.objects:
                 if obj.type == 'ARMATURE':
@@ -37,16 +37,16 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                     if not util.is_hide(obj):
                         print("  " * depth + "[OBJ]" +
                               obj.name + " - " + obj.type)
-                        self.apply_all_modifier(obj)
+                        self.apply_all_modifier(context, obj)
                         join_meshes.append((obj, path))
 
             for child in collection.children:
                 if child.hide_viewport or child.exclude:
                     pass
                 else:
-                    walkdown_collection(child, path, depth+1)
+                    walkdown_collection(context, child, path, depth+1)
 
-        walkdown_collection(root_layer_collection)
+        walkdown_collection(context, root_layer_collection)
 
         # join meshes
         join_dict = {}
@@ -203,10 +203,19 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         util.select(active, True)
         bpy.ops.object.join()
 
-    def apply_all_modifier(self, obj):
+    def apply_all_modifier(self, context, obj):
+        props = util.get_settings(context)
         bpy.ops.object.select_all(action='DESELECT')
         util.select(obj, True)
         print("{} - {} ({})".format(obj.name, obj.type, util.is_hide(obj)))
+        if props.make_single_user:
+            bpy.ops.object.make_single_user(
+                type='SELECTED_OBJECTS',
+                object=True,
+                obdata=True,
+                material=False,
+                animation=False
+            )
         if obj.data.shape_keys and hasattr(bpy.types, "OBJECT_OT_apply_all_modifier"):
             for mod in obj.modifiers:
                 if mod.type in 'ARMATURE':

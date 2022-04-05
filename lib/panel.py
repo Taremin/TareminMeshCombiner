@@ -27,6 +27,8 @@ class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
         row.prop(props, 'output_default_object')
         row = layout.row(align=True)
         row.prop(props, 'remove_unnecessary_bones')
+        row = layout.row(align=True)
+        row.prop(props, 'make_single_user')
 
         layout.separator()
 
