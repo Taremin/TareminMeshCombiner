@@ -11,7 +11,7 @@ bl_info = {
     'author': 'Taremin',
     'location': 'View 3D > UI > Taremin',
     'description': "mesh combine tool",
-    'version': (0, 1, 1),
+    'version': (0, 1, 2),
     'blender': (2, 80, 0),
     'wiki_url': '',
     'tracker_url': '',
