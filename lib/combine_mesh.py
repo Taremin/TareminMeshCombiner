@@ -270,7 +270,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 scene.collection.children.unlink(collection)
 
     def dissolve(self, obj, child_vertex_group, parent_vertex_group):
-        selected = numpy.zeros(len(obj.data.vertices), dtype=numpy.bool)
+        selected = numpy.zeros(len(obj.data.vertices), dtype=bool)
 
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='DESELECT')
