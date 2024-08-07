@@ -216,13 +216,13 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         for obj in meshes:
             print("\t{} - Join".format(obj.name))
             util.select(obj, True)
-            if obj.data.has_custom_normals and obj.data.use_auto_smooth:
+            if obj.data.has_custom_normals and hasattr(obj.data, "use_auto_smooth") and obj.data.use_auto_smooth:
                 auto_smooth = True
 
         util.select(active, True)
         bpy.ops.object.join()
 
-        if auto_smooth:
+        if auto_smooth and hasattr(active.data, "use_auto_smooth"):
             active.data.use_auto_smooth = True
 
     def apply_all_modifier(self, context, obj):
