@@ -151,18 +151,33 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 util.select(armature, True)
                 bpy.ops.object.mode_set(mode='EDIT')
 
+                def get_bone_visibility(armature, bone):
+                    # Legacy
+                    if hasattr(bone, "layers"):
+                        for index in range(len(bone.layers)):
+                            if armature.data.layers[index] and bone.layers[index]:
+                                return True
+                        return False
+                    # Blender 4.0+
+                    if hasattr(bone, "collections"):
+                        for bone_collection in bone.collections:
+                            if bone_collection.is_visible:
+                                return True
+                        return False
+                    raise Exception("Unsupported Blender Version")
+
                 # 非選択アーマチュアレイヤーのボーンを削除
                 for bone in armature.data.edit_bones:
-                    selected = False
-                    for layer_index in range(len(bone.layers)):
-                        if armature.data.layers[layer_index] and bone.layers[
-                                layer_index]:
-                            selected = True
-                            break
-                    if not selected:
+                    visible = get_bone_visibility(armature, bone)
+                    if not visible:
                         print("\t{} - Delete Bone".format(bone.name))
-                        for bone_layer_index in range(len(bone.layers)):
-                            bone.layers[bone_layer_index] = True
+
+                        # Legacy
+                        # 非表示ではボーンの操作ができない可能性があるため念のためレイヤーを表示しているが不要かもしれない
+                        if hasattr(bone, "layers"):
+                            for bone_layer_index in range(len(bone.layers)):
+                                bone.layers[bone_layer_index] = True
+
                         bone.hide = False
                         bone.select = True
 
