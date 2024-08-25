@@ -6,10 +6,10 @@ from . import util
 
 
 class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
-    bl_idname = 'taremin.combine_mesh'
-    bl_label = '結合'
-    bl_description = 'オブジェクトの結合と不要なオブジェクトの削除を行う'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = "taremin.combine_mesh"
+    bl_label = "結合"
+    bl_description = "オブジェクトの結合と不要なオブジェクトの削除を行う"
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         scene = context.scene
@@ -19,8 +19,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         active = objects.active
 
         root_layer_collection = bpy.context.view_layer.layer_collection
-        dest_col = bpy.data.collections.new(
-            props.output_collection)
+        dest_col = bpy.data.collections.new(props.output_collection)
         root_layer_collection.collection.children.link(dest_col)
 
         join_meshes = []
@@ -28,15 +27,14 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         def walkdown_collection(context, collection, path=[], depth=0):
             path = path + [collection]
             for obj in collection.collection.objects:
-                if obj.type == 'ARMATURE':
+                if obj.type == "ARMATURE":
                     try:
                         dest_col.objects.link(obj)
                     except RuntimeError:
                         pass  # obj is already exists in dest_col
-                if obj.type == 'MESH':
+                if obj.type == "MESH":
                     if not util.is_hide(obj):
-                        print("  " * depth + "[OBJ]" +
-                              obj.name + " - " + obj.type)
+                        print("  " * depth + "[OBJ]" + obj.name + " - " + obj.type)
                         self.apply_all_modifier(context, obj)
                         join_meshes.append((obj, path))
 
@@ -44,7 +42,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 if child.hide_viewport or child.exclude:
                     pass
                 else:
-                    walkdown_collection(context, child, path, depth+1)
+                    walkdown_collection(context, child, path, depth + 1)
 
         walkdown_collection(context, root_layer_collection)
 
@@ -54,7 +52,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
             match = False
             for group in props.combine_groups:
                 name = group.object_name
-                if group.group_type == 'COLLECTION':
+                if group.group_type == "COLLECTION":
                     path_names = [collection.name for collection in path]
                     if len(path_names) > 0 and group.collection.name == path_names[-1]:
                         if name not in join_dict:
@@ -62,7 +60,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                         join_dict[name].append(obj)
                         match = True
                         break
-                elif group.group_type == 'COLLECTION_RECURSIVE':
+                elif group.group_type == "COLLECTION_RECURSIVE":
                     path_names = [collection.name for collection in path]
                     if group.collection.name in path_names:
                         if name not in join_dict:
@@ -70,7 +68,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                         join_dict[name].append(obj)
                         match = True
                         break
-                elif group.group_type == 'REGEXP':
+                elif group.group_type == "REGEXP":
                     pattern = re.compile(group.regexp)
                     if pattern.match(obj.name):
                         name = pattern.sub(name, obj.name)
@@ -96,8 +94,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
             # add armature modifier
             for target in self.get_armature_modifier_targets(meshes):
-                modifier = dest_obj.modifiers.new(
-                    name='Armature', type='ARMATURE')
+                modifier = dest_obj.modifiers.new(name="Armature", type="ARMATURE")
                 modifier.object = bpy.data.objects[target]
 
             print("JOIN:", dest_obj, meshes)
@@ -107,7 +104,8 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         for layer_collection in root_layer_collection.children:
             if layer_collection.collection is not dest_col:
                 root_layer_collection.collection.children.unlink(
-                    layer_collection.collection)
+                    layer_collection.collection
+                )
         for obj in root_layer_collection.collection.objects:
             root_layer_collection.collection.objects.unlink(obj)
 
@@ -115,25 +113,25 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         # "Merge." から始まる頂点グループの重複頂点の削除で結合する
         #
         print("Merge vertex group")
-        bpy.ops.object.select_all(action='DESELECT')
-        vg_pattern = re.compile(r'^Merge\.')
+        bpy.ops.object.select_all(action="DESELECT")
+        vg_pattern = re.compile(r"^Merge\.")
         for obj in util.get_scene_objects():
             print("Mesh: {} ({})".format(obj.name, obj.type))
-            if obj.type not in 'MESH':
+            if obj.type not in "MESH":
                 continue
             for idx in range(0, len(obj.vertex_groups)):
                 vg = obj.vertex_groups[idx]
                 if vg_pattern.search(vg.name):
                     util.select(obj, True)
-                    bpy.ops.object.mode_set(mode='EDIT')
+                    bpy.ops.object.mode_set(mode="EDIT")
 
                     print("Merge mesh: {}".format(vg.name))
-                    bpy.ops.mesh.select_all(action='DESELECT')
+                    bpy.ops.mesh.select_all(action="DESELECT")
                     obj.vertex_groups.active_index = vg.index
                     bpy.ops.object.vertex_group_select()
                     bpy.ops.mesh.remove_doubles(threshold=0.0)
 
-                    bpy.ops.object.mode_set(mode='OBJECT')
+                    bpy.ops.object.mode_set(mode="OBJECT")
 
         #
         # 非選択アーマチュアレイヤーのボーンを削除
@@ -149,7 +147,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                     util.set_hide(armature, False)
                 print("Armature: {}".format(armature.name))
                 util.select(armature, True)
-                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.object.mode_set(mode="EDIT")
 
                 def get_bone_visibility(armature, bone):
                     # Legacy
@@ -185,38 +183,45 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                             removed_bones.append([bone.name, bone.parent.name])
 
                         armature.data.edit_bones.remove(bone)
-                bpy.ops.object.mode_set(mode='OBJECT')
+                bpy.ops.object.mode_set(mode="OBJECT")
 
             # 削除したボーンの頂点ウェイトを親に加算していく
             for obj in scene.objects:
-                if obj.type not in 'MESH':
+                if obj.type not in "MESH":
                     continue
 
-                for (child, parent) in removed_bones:
+                for child, parent in removed_bones:
                     if obj.vertex_groups.get(child) and obj.vertex_groups.get(parent):
                         print("Dissolve: {} -> {}".format(child, parent))
                         util.set_active_object(obj)
-                        self.dissolve(obj, obj.vertex_groups.get(child),
-                                      obj.vertex_groups.get(parent))
+                        self.dissolve(
+                            obj,
+                            obj.vertex_groups.get(child),
+                            obj.vertex_groups.get(parent),
+                        )
 
         if props.remove_empty_collection:
             self.remove_empty_collection(scene)
 
         # active
         if active in meshes:
-            bpy.ops.object.select_all(action='DESELECT')
-            #select(active, True)
+            bpy.ops.object.select_all(action="DESELECT")
+            # select(active, True)
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def join_mesh(self, active, meshes):
         print("Join all mesh objects")
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action="DESELECT")
         auto_smooth = False
         for obj in meshes:
             print("\t{} - Join".format(obj.name))
             util.select(obj, True)
-            if obj.data.has_custom_normals and hasattr(obj.data, "use_auto_smooth") and obj.data.use_auto_smooth:
+            if (
+                obj.data.has_custom_normals
+                and hasattr(obj.data, "use_auto_smooth")
+                and obj.data.use_auto_smooth
+            ):
                 auto_smooth = True
 
         util.select(active, True)
@@ -227,29 +232,29 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
     def apply_all_modifier(self, context, obj):
         props = util.get_settings(context)
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action="DESELECT")
         util.select(obj, True)
         print("{} - {} ({})".format(obj.name, obj.type, util.is_hide(obj)))
         if props.make_single_user:
             bpy.ops.object.make_single_user(
-                type='SELECTED_OBJECTS',
+                type="SELECTED_OBJECTS",
                 object=True,
                 obdata=True,
                 material=False,
-                animation=False
+                animation=False,
             )
         if obj.data.shape_keys and hasattr(bpy.types, "OBJECT_OT_apply_all_modifier"):
             for mod in obj.modifiers:
-                if mod.type in 'ARMATURE':
+                if mod.type in "ARMATURE":
                     mod.show_viewport = False
             print("\t{} - All apply".format(obj.name))
             bpy.ops.object.apply_all_modifier()
             for mod in obj.modifiers:
-                if mod.type in 'ARMATURE':
+                if mod.type in "ARMATURE":
                     mod.show_viewport = True
         else:
             for mod in obj.modifiers:
-                if mod.type not in 'ARMATURE':
+                if mod.type not in "ARMATURE":
                     print("\t{} - Apply".format(mod.type))
                     bpy.ops.object.modifier_apply(modifier=mod.name)
                 else:
@@ -259,7 +264,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         modifier_targets = set([])
         for obj in mesh_objects:
             for modifier in obj.modifiers:
-                if modifier.type in 'ARMATURE':
+                if modifier.type in "ARMATURE":
                     modifier_targets.add(modifier.object.name)
         return modifier_targets
 
@@ -272,18 +277,17 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
     def dissolve(self, obj, child_vertex_group, parent_vertex_group):
         selected = numpy.zeros(len(obj.data.vertices), dtype=bool)
 
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="DESELECT")
         bpy.ops.object.vertex_group_set_active(group=child_vertex_group.name)
         bpy.ops.object.vertex_group_select()
-        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.mode_set(mode="OBJECT")
 
-        obj.data.vertices.foreach_get('select', selected)
+        obj.data.vertices.foreach_get("select", selected)
 
         for v in numpy.array(obj.data.vertices)[selected]:
             vi = [v.index]
-            parent_vertex_group.add(vi, child_vertex_group.weight(v.index),
-                                    'ADD')
+            parent_vertex_group.add(vi, child_vertex_group.weight(v.index), "ADD")
             child_vertex_group.remove(vi)
 
     def remove_hidden_collection(self, context, parent):
@@ -291,7 +295,10 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         for collection in parent.children:
             if collection.hide_viewport or collection.exclude:
                 print(
-                    "\t{} - Delete Collection from {}".format(collection.name, parent.name))
+                    "\t{} - Delete Collection from {}".format(
+                        collection.name, parent.name
+                    )
+                )
                 parent.collection.children.unlink(collection.collection)
             else:
                 self.remove_hidden_collection(context, collection)
