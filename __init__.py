@@ -6,16 +6,16 @@ from pathlib import Path
 
 
 bl_info = {
-    'name': 'Taremin Mesh Combiner',
-    'category': '3D View',
-    'author': 'Taremin',
-    'location': 'View 3D > UI > Taremin',
-    'description': "mesh combine tool",
-    'version': (0, 1, 3),
-    'blender': (2, 80, 0),
-    'wiki_url': '',
-    'tracker_url': '',
-    'warning': '',
+    "name": "Taremin Mesh Combiner",
+    "category": "3D View",
+    "author": "Taremin",
+    "location": "View 3D > UI > Taremin",
+    "description": "mesh combine tool",
+    "version": (0, 1, 3),
+    "blender": (2, 80, 0),
+    "wiki_url": "",
+    "tracker_url": "",
+    "warning": "",
 }
 
 # モジュール読み込み
@@ -28,7 +28,7 @@ module_names = [
 ]
 namespace = globals()
 for name in module_names:
-    fullname = '{}.{}.{}'.format(__package__, "lib", name)
+    fullname = "{}.{}.{}".format(__package__, "lib", name)
     if fullname in sys.modules:
         namespace[name] = importlib.reload(sys.modules[fullname])
     else:
@@ -39,7 +39,11 @@ classes = [
     # このファイル内のBlenderクラス
 ]
 for module in module_names:
-    for module_class in [obj for name, obj in inspect.getmembers(namespace[module], inspect.isclass) if hasattr(obj, "bl_rna")]:
+    for module_class in [
+        obj
+        for name, obj in inspect.getmembers(namespace[module], inspect.isclass)
+        if hasattr(obj, "bl_rna")
+    ]:
         classes.append(module_class)
 
 
@@ -57,7 +61,8 @@ def register():
                     break
     props = namespace["props"]
     bpy.types.Scene.taremin_mc = bpy.props.PointerProperty(
-        type=props.TareminMeshCombinerProps)
+        type=props.TareminMeshCombinerProps
+    )
 
 
 def unregister():
@@ -72,5 +77,5 @@ def unregister():
     Path(__file__).touch()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     register()
