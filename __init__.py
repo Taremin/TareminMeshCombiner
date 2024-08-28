@@ -22,6 +22,7 @@ bl_info = {
 module_names = [
     "util",
     "group_settings",
+    "shape_key_split_settings",
     "props",
     "combine_mesh",
     "panel",

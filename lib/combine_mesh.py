@@ -100,6 +100,13 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
             print("JOIN:", dest_obj, meshes)
             self.join_mesh(dest_obj, meshes)
 
+            shape_keys = set()
+            for shape_key_split in props.shape_key_split:
+                if shape_key_split.object in meshes:
+                    shape_keys.add(shape_key_split.shape_key)
+            for shape_key in shape_keys:
+                self.split_shape_key(context, dest_obj, shape_key)
+
         # remove all collections without destination collection
         for layer_collection in root_layer_collection.children:
             if layer_collection.collection is not dest_col:
@@ -302,3 +309,37 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 parent.collection.children.unlink(collection.collection)
             else:
                 self.remove_hidden_collection(context, collection)
+
+    def create_split_shape_key(self, obj, name, points, where_result):
+        split = obj.shape_key_add(name=name, from_mix=False)
+        spoints = numpy.empty((len(split.points), 3), dtype=numpy.float32)
+        split.points.foreach_get("co", spoints.ravel())
+
+        spoints[where_result] = points[where_result]
+
+        split.points.foreach_set("co", spoints.ravel())
+
+        return split
+
+    def split_shape_key(self, context, obj, shape_key_name):
+        obj = bpy.context.active_object
+        mesh = obj.data
+        props = util.get_settings(context)
+
+        key_blocks = mesh.shape_keys.key_blocks
+        shape_key = key_blocks[shape_key_name]
+        shape_key_basis = shape_key.relative_key
+
+        if shape_key == shape_key_basis:
+            raise ValueError("Can't split basis shape key")
+
+        basis = numpy.empty((len(shape_key_basis.points), 3), dtype=numpy.float32)
+        shape_key_basis.points.foreach_get("co", basis.ravel())
+
+        points = numpy.empty((len(shape_key.points), 3), dtype=numpy.float32)
+        shape_key.points.foreach_get("co", points.ravel())
+
+        left, right = props.left_right_axis[props.shape_key_split_axis_mode](basis)
+
+        self.create_split_shape_key(obj, shape_key.name + ".L", points, left)
+        self.create_split_shape_key(obj, shape_key.name + ".R", points, right)

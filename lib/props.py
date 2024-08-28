@@ -1,5 +1,10 @@
 import bpy
-from . import group_settings
+import numpy
+from . import group_settings, shape_key_split_settings
+
+# for EnumProperty bug
+# https://docs.blender.org/api/current/bpy.props.html#bpy.props.EnumProperty
+shape_key_split_axis_mode_enum = None
 
 
 class TareminMeshCombinerProps(bpy.types.PropertyGroup):
@@ -29,3 +34,31 @@ class TareminMeshCombinerProps(bpy.types.PropertyGroup):
         type=group_settings.TareminMeshCombinerGroupSettings
     )
     combine_group_index: bpy.props.IntProperty()
+
+    shape_key_split_folding: bpy.props.BoolProperty()
+    shape_key_split: bpy.props.CollectionProperty(
+        type=shape_key_split_settings.TareminMeshCombinerShapeKeySplitSettings
+    )
+    shape_key_split_index: bpy.props.IntProperty()
+
+    left_right_axis = {
+        "Left:+X, Right:-X": lambda basis: [
+            x := basis.ravel()[0::3],
+            (numpy.where(x > 0.0), numpy.where(x < 0.0)),
+        ][-1],
+        "Left:-X, Right:+X": lambda basis: [
+            x := basis.ravel()[0::3],
+            (numpy.where(x < 0.0), numpy.where(x > 0.0)),
+        ][-1],
+    }
+
+    def get_shape_key_split_axis_mode(self, context):
+        global shape_key_split_axis_mode_enum
+        shape_key_split_axis_mode_enum = [
+            (key, key, key) for key, value in self.left_right_axis.items()
+        ]
+        return shape_key_split_axis_mode_enum
+
+    shape_key_split_axis_mode: bpy.props.EnumProperty(
+        items=get_shape_key_split_axis_mode
+    )

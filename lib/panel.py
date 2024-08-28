@@ -1,5 +1,5 @@
 import bpy
-from . import combine_mesh, group_settings, util
+from . import combine_mesh, group_settings, shape_key_split_settings, util
 
 
 class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
@@ -72,6 +72,57 @@ class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
             )
             col.operator(
                 operator=group_settings.TAREMIN_MESH_COMBINER_OT_GroupSettings_Down.bl_idname,
+                text="",
+                icon="TRIA_DOWN",
+            )
+
+        layout.separator()
+
+        row = layout.row()
+        row.prop(
+            props,
+            "shape_key_split_folding",
+            icon="TRIA_RIGHT" if props.shape_key_split_folding else "TRIA_DOWN",
+            icon_only=True,
+        )
+        row.label(text="Split ShapeKey")
+
+        if not props.shape_key_split_folding:
+            row = layout.row()
+            col = row.column()
+
+            row.prop(props, "shape_key_split_axis_mode", text="Split Axis")
+
+            row = layout.row()
+            col = row.column()
+            col.template_list(
+                "TAREMIN_MESH_COMBINER_UL_ShapeKeySplitSettings",
+                "",
+                props,
+                "shape_key_split",
+                props,
+                "shape_key_split_index",
+                type="DEFAULT",
+            )
+            col = row.column(align=True)
+            col.operator(
+                operator=shape_key_split_settings.TAREMIN_MESH_COMBINER_OT_ShapeKeySplitSettings_Add.bl_idname,
+                text="",
+                icon="ADD",
+            )
+            col.operator(
+                operator=shape_key_split_settings.TAREMIN_MESH_COMBINER_OT_ShapeKeySplitSettings_Remove.bl_idname,
+                text="",
+                icon="REMOVE",
+            )
+            col.separator()
+            col.operator(
+                operator=shape_key_split_settings.TAREMIN_MESH_COMBINER_OT_ShapeKeySplitSettings_Up.bl_idname,
+                text="",
+                icon="TRIA_UP",
+            )
+            col.operator(
+                operator=shape_key_split_settings.TAREMIN_MESH_COMBINER_OT_ShapeKeySplitSettings_Down.bl_idname,
                 text="",
                 icon="TRIA_DOWN",
             )
