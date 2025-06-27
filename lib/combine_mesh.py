@@ -322,7 +322,6 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         return split
 
     def split_shape_key(self, context, obj, shape_key_name):
-        obj = bpy.context.active_object
         mesh = obj.data
         props = util.get_settings(context)
 
