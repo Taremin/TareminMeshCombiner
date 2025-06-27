@@ -342,3 +342,95 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
         self.create_split_shape_key(obj, shape_key.name + ".L", points, left)
         self.create_split_shape_key(obj, shape_key.name + ".R", points, right)
+
+
+class TAREMIN_MESH_COMBINER_OT_ApplyShapeKeyVertexGroup(bpy.types.Operator):
+    bl_idname = "taremin.apply_shape_key_vertex_group"
+    bl_label = "シェイプキーの頂点グループを適用"
+    bl_description = "指定されたシェイプキーの変形を、頂点グループのウェイトに基づいてシェイプキー自体に適用します"
+    bl_options = {"REGISTER", "UNDO"}
+
+    target_object: bpy.props.StringProperty(name="Object")
+    target_shape_key: bpy.props.StringProperty(name="シェイプキー")
+
+    def execute(self, context):
+        obj = bpy.data.objects.get(self.target_object)
+        shape_key_name = self.target_shape_key
+
+        if not obj or not obj.data or not obj.data.shape_keys:
+            self.report(
+                {"ERROR"}, "有効なオブジェクトまたはシェイプキーが選択されていません。"
+            )
+            return {"CANCELLED"}
+
+        basis_key = obj.data.shape_keys.key_blocks.get("Basis")
+        if not basis_key:
+            self.report({"ERROR"}, "Basisシェイプキーが見つかりません。")
+            return {"CANCELLED"}
+
+        target_key_block = obj.data.shape_keys.key_blocks.get(shape_key_name)
+        if not target_key_block or target_key_block == basis_key:
+            self.report({"ERROR"}, "有効なシェイプキーが選択されていません。")
+            return {"CANCELLED"}
+
+        vg_name = target_key_block.vertex_group
+        if not vg_name:
+            self.report(
+                {"ERROR"}, "選択されたシェイプキーに頂点グループが設定されていません。"
+            )
+            return {"CANCELLED"}
+
+        vg = obj.vertex_groups.get(vg_name)
+        if not vg:
+            self.report(
+                {"ERROR"},
+                "指定された頂点グループ '{}' がオブジェクトに見つかりません。".format(
+                    vg_name
+                ),
+            )
+            return {"CANCELLED"}
+
+        # Ensure object is in OBJECT mode for data access
+        if obj.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+        # Get Basis shape key points
+        basis_coords = numpy.empty(len(basis_key.points) * 3, dtype=numpy.float32)
+        basis_key.points.foreach_get("co", basis_coords)
+        basis_coords = basis_coords.reshape(-1, 3)
+
+        # Get the target shape key's own point data.
+        sk_points = numpy.empty(len(target_key_block.points) * 3, dtype=numpy.float32)
+        target_key_block.points.foreach_get("co", sk_points)
+        sk_points = sk_points.reshape(-1, 3)
+
+        # Calculate the delta from Basis for this shape key
+        deltas = sk_points - basis_coords
+
+        # Apply the deltas to the Basis coordinates, masked by vertex group weights
+        for v_idx in range(len(obj.data.vertices)):
+            # Check if the vertex belongs to the vertex group and get its weight
+            weight = 0.0
+            for g in obj.data.vertices[v_idx].groups:
+                if g.group == vg.index:
+                    weight = g.weight
+                    break
+            if weight > 0:
+                basis_coords[v_idx] += deltas[v_idx] * weight
+
+        # Update the Basis shape key with the baked deformations
+        # basis_key.points.foreach_set("co", basis_coords.ravel())
+
+        # After baking, reset the shape key's value to 0.0 and clear its vertex group
+        target_key_block.value = 0.0
+        target_key_block.vertex_group = (
+            ""  # Clear the vertex group as its effect is now baked
+        )
+
+        target_key_block.points.foreach_set("co", basis_coords.ravel())
+
+        self.report(
+            {"INFO"},
+            "シェイプキー '{}' に頂点グループを適用しました。".format(shape_key_name),
+        )
+        return {"FINISHED"}

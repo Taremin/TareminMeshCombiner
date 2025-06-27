@@ -141,3 +141,45 @@ class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
         col.operator(
             operator=combine_mesh.TAREMIN_MESH_COMBINER_OT_CombineMesh.bl_idname
         )
+
+
+class TAREMIN_MESH_COMBINER_PT_ApplyShapeKeyPanel(bpy.types.Panel):
+    bl_label = "Taremin Mesh Combiner"
+    bl_idname = "TAREMIN_PT_apply_shape_key_panel"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "data"  # 「データ」タブ (Object Data Properties)
+    bl_parent_id = (
+        "DATA_PT_shape_keys"  # 標準のシェイプキーパネルのサブパネルとして表示
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        # メッシュオブジェクトが選択されており、かつシェイプキーが存在する場合にのみ表示
+        return obj and obj.type == "MESH" and obj.data and obj.data.shape_keys
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.active_object
+
+        active_sk = obj.active_shape_key
+
+        # アクティブなシェイプキーが存在し、それがBasisではなく、かつ頂点グループが設定されているか確認
+        is_bakeable = bool(
+            active_sk is not None
+            and active_sk != active_sk.relative_key
+            and active_sk.vertex_group
+        )
+
+        row = layout.row()
+        row.enabled = is_bakeable
+
+        # オペレーターボタンを常に表示し、条件に応じて有効/無効を切り替える
+        op = row.operator(
+            "taremin.apply_shape_key_vertex_group",
+            text="アクティブなシェイプキーに適用",
+        )
+        op.target_object = obj.name
+        if active_sk:
+            op.target_shape_key = active_sk.name
