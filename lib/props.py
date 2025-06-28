@@ -29,6 +29,11 @@ class TareminMeshCombinerProps(bpy.types.PropertyGroup):
         default=True,
         description="モディファイアの適用前にオブジェクトのシングルユーザー化を行う",
     )
+    apply_shape_key_vertex_groups: bpy.props.BoolProperty(
+        name="シェイプキーの頂点グループを適用",
+        default=False,
+        description="結合前に、頂点グループが設定されたシェイプキーの変形をBasisに適用します",
+    )
     groups_folding: bpy.props.BoolProperty()
     combine_groups: bpy.props.CollectionProperty(
         type=group_settings.TareminMeshCombinerGroupSettings

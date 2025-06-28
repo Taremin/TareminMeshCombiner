@@ -35,6 +35,36 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 if obj.type == "MESH":
                     if not util.is_hide(obj):
                         print("  " * depth + "[OBJ]" + obj.name + " - " + obj.type)
+
+                        # Apply shape key vertex groups if enabled
+                        if props.apply_shape_key_vertex_groups and obj.data.shape_keys:
+                            # Ensure object is in OBJECT mode for operator calls
+                            if context.mode != "OBJECT":
+                                bpy.ops.object.mode_set(mode="OBJECT")
+
+                            # Set active object and select it for the operator to work correctly
+                            util.set_active_object(obj)
+                            bpy.ops.object.select_all(action="DESELECT")  # Deselect all
+                            util.select(obj, True)  # Select current object
+
+                            # Iterate over a copy of key_blocks because we might remove them
+                            for sk in list(obj.data.shape_keys.key_blocks):
+                                # Skip Basis key and keys without a vertex group
+                                if sk.name == "Basis" or not sk.vertex_group:
+                                    continue
+                                print(
+                                    f"    Applying shape key vertex group for: {obj.name} - {sk.name}"
+                                )
+                                try:
+                                    bpy.ops.taremin.apply_shape_key_vertex_group(
+                                        target_object=obj.name, target_shape_key=sk.name
+                                    )
+                                except RuntimeError as e:
+                                    self.report(
+                                        {"WARNING"},
+                                        f"Failed to apply shape key vertex group for {obj.name} - {sk.name}: {e}",
+                                    )
+
                         self.apply_all_modifier(context, obj)
                         join_meshes.append((obj, path))
 
