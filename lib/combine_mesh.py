@@ -18,6 +18,13 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         objects = util.get_scene_objects()
         active = objects.active
 
+        # シェイプキーが変更されると設定された Split ShapeKey も変化するために事前に退避
+        shapekey_split_settings = []
+        for shape_key_split in props.shape_key_split:
+            shapekey_split_settings.append(
+                (shape_key_split.object, shape_key_split.shape_key)
+            )
+
         root_layer_collection = bpy.context.view_layer.layer_collection
         dest_col = bpy.data.collections.new(props.output_collection)
         root_layer_collection.collection.children.link(dest_col)
@@ -130,10 +137,11 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
             print("JOIN:", dest_obj, meshes)
             self.join_mesh(dest_obj, meshes)
 
+            # split shapekey
             shape_keys = set()
-            for shape_key_split in props.shape_key_split:
-                if shape_key_split.object in meshes:
-                    shape_keys.add(shape_key_split.shape_key)
+            for obj, shape_key in shapekey_split_settings:
+                if obj in meshes:
+                    shape_keys.add(shape_key)
             for shape_key in shape_keys:
                 self.split_shape_key(context, dest_obj, shape_key)
 
@@ -239,6 +247,13 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
         if props.remove_empty_collection:
             self.remove_empty_collection(scene)
+
+        # restore shapekey settings
+        props.shape_key_split.clear()
+        for obj, shape_key in shapekey_split_settings:
+            tmp = props.shape_key_split.add()
+            tmp.object = obj
+            tmp.shape_key = shape_key
 
         # active
         if active in meshes:
