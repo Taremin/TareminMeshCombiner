@@ -73,6 +73,11 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                                     )
 
                         self.apply_all_modifier(context, obj)
+
+                        # 不必要な頂点グループを削除
+                        if props.remove_unnecessary_vertex_groups:
+                            self.remove_unnecessary_vertex_groups(obj, True)
+
                         join_meshes.append((obj, path))
 
             for child in collection.children:
@@ -177,6 +182,9 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                     bpy.ops.mesh.remove_doubles(threshold=0.0)
 
                     bpy.ops.object.mode_set(mode="OBJECT")
+
+            if props.remove_unnecessary_vertex_groups:
+                self.remove_unnecessary_vertex_groups(obj, False)
 
         #
         # 非選択アーマチュアレイヤーのボーンを削除
@@ -395,6 +403,23 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         self.create_split_shape_key(obj, shape_key.name + ".L", points, left)
         self.create_split_shape_key(obj, shape_key.name + ".R", points, right)
 
+    def is_deform_bone(self, armature, vertex_group_name):
+        bone = armature.data.bones.get(vertex_group_name)
+        if bone and bone.use_deform:
+            return True
+        return False
+    
+    def remove_unnecessary_vertex_groups(self, obj, exclude_merge_groups):
+        vg_pattern = re.compile(r"^Merge\.") # tmp, 同じパターンがあるのであとで纏める
+        for target in self.get_armature_modifier_targets([obj]):
+            armature = bpy.data.objects[target]
+
+            for i, vg in reversed(list(enumerate(obj.vertex_groups))):
+                if exclude_merge_groups and vg_pattern.search(vg.name):
+                    continue
+                if self.is_deform_bone(armature, vg.name):
+                    continue
+                obj.vertex_groups.remove(vg)
 
 class TAREMIN_MESH_COMBINER_OT_ApplyShapeKeyVertexGroup(bpy.types.Operator):
     bl_idname = "taremin.apply_shape_key_vertex_group"

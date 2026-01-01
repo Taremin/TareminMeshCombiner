@@ -14,6 +14,11 @@ class TareminMeshCombinerProps(bpy.types.PropertyGroup):
     output_default_object: bpy.props.StringProperty(
         name="Default Output Object", default="Combined"
     )
+    remove_unnecessary_vertex_groups: bpy.props.BoolProperty(
+        name="デフォームボーン以外の頂点グループの削除",
+        default=True,
+        description="デフォームボーン以外の頂点グループの削除を行う",
+    )
     remove_unnecessary_bones: bpy.props.BoolProperty(
         name="非選択アーマチュアレイヤーのボーン削除",
         default=True,

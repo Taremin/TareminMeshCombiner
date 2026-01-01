@@ -28,6 +28,8 @@ class TAREMIN_MESH_COMBINER_PT_Panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.prop(props, "remove_unnecessary_bones")
         row = layout.row(align=True)
+        row.prop(props, "remove_unnecessary_vertex_groups")
+        row = layout.row(align=True)
         row.prop(props, "apply_shape_key_vertex_groups")
         row = layout.row(align=True)
         row.prop(props, "make_single_user")
