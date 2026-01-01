@@ -264,10 +264,10 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
     def join_mesh(self, active, meshes):
         print("Join all mesh objects")
-        bpy.ops.object.select_all(action="DESELECT")
         auto_smooth = False
         material_set = set()
         for obj in meshes:
+            bpy.ops.object.select_all(action="DESELECT")
             print("\t{} - Join".format(obj.name))
             util.select(obj, True)
             material_set.update([slot.name for slot in obj.material_slots])
@@ -277,9 +277,8 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
                 and obj.data.use_auto_smooth
             ):
                 auto_smooth = True
-
-        util.select(active, True)
-        bpy.ops.object.join()
+            util.select(active, True)
+            bpy.ops.object.join()
 
         for i, slot in reversed(list(enumerate(active.data.materials))):
             if (slot is not None) and (slot.name in material_set):
