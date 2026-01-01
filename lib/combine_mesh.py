@@ -370,6 +370,7 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         spoints[where_result] = points[where_result]
 
         split.points.foreach_set("co", spoints.ravel())
+        split.value = 0.0
 
         return split
 
