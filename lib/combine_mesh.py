@@ -266,9 +266,11 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
         print("Join all mesh objects")
         bpy.ops.object.select_all(action="DESELECT")
         auto_smooth = False
+        material_set = set()
         for obj in meshes:
             print("\t{} - Join".format(obj.name))
             util.select(obj, True)
+            material_set.update([slot.name for slot in obj.material_slots])
             if (
                 obj.data.has_custom_normals
                 and hasattr(obj.data, "use_auto_smooth")
@@ -278,6 +280,11 @@ class TAREMIN_MESH_COMBINER_OT_CombineMesh(bpy.types.Operator):
 
         util.select(active, True)
         bpy.ops.object.join()
+
+        for i, slot in reversed(list(enumerate(active.data.materials))):
+            if (slot is not None) and (slot.name in material_set):
+                continue
+            active.data.materials.pop(index=i)
 
         if auto_smooth and hasattr(active.data, "use_auto_smooth"):
             active.data.use_auto_smooth = True
